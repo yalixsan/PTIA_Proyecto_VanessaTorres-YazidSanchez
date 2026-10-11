@@ -36,7 +36,7 @@ class HomeScreen extends StatelessWidget {
                   style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
                 ),
               ),
-              const SizedBox(width: 40),
+              const AppLogo(),
             ],
           ),
         ),

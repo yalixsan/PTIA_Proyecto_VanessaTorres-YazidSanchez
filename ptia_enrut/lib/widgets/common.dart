@@ -158,8 +158,28 @@ class ScreenHeader extends StatelessWidget {
               ),
             ),
           ),
+          const SizedBox(width: 8),
+          const AppLogo(),
         ],
       ),
+    );
+  }
+}
+
+/// Logo de Enrut.AI que va en la esquina superior derecha de las pantallas.
+class AppLogo extends StatelessWidget {
+  const AppLogo({super.key, this.size = 40});
+
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return Image.asset(
+      'assets/images/logo_enrut.png',
+      width: size,
+      height: size,
+      fit: BoxFit.contain,
+      semanticLabel: 'Logo Enrut.AI',
     );
   }
 }

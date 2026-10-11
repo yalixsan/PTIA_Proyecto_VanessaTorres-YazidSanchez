@@ -5,6 +5,7 @@ import '../state/app_state.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_bottom_nav.dart';
 import '../widgets/common.dart';
+import '../widgets/selector_partida.dart';
 import 'main_shell.dart';
 import 'mapa_rutas_screen.dart';
 
@@ -24,11 +25,13 @@ class _ListaEntregasScreenState extends State<ListaEntregasScreen> {
     super.dispose();
   }
 
-  void _iniciarRuta() {
-    if (!appState.iniciarRuta()) {
+  Future<void> _iniciarRuta() async {
+    if (appState.seleccionados.isEmpty) {
       mostrarMensaje(context, 'Selecciona al menos un pedido para iniciar.');
       return;
     }
+    final iniciada = await mostrarSelectorPartida(context);
+    if (iniciada != true || !mounted) return;
     Navigator.of(context)
         .push(MaterialPageRoute(builder: (_) => const MapaRutasScreen()));
   }

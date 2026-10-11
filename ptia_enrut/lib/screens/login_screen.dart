@@ -48,6 +48,9 @@ class _LoginScreenState extends State<LoginScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    // Mismo ancho aproximado que el texto "Enrut.AI".
+                    const Center(child: AppLogo(size: 112)),
+                    const SizedBox(height: 16),
                     const Text(
                       'Enrut.AI',
                       textAlign: TextAlign.center,

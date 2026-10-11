@@ -94,7 +94,10 @@ class MapaRutasScreen extends StatelessWidget {
                                       ),
                                     )
                                   : CustomPaint(
-                                      painter: _RutaPainter(ruta),
+                                      painter: _RutaPainter(
+                                        ruta,
+                                        appState.partida,
+                                      ),
                                       size: Size.infinite,
                                     ),
                             ),
@@ -127,6 +130,30 @@ class MapaRutasScreen extends StatelessWidget {
                               ],
                             ),
                             const Divider(color: AppColors.border, height: 20),
+                            if (appState.partida case final partida?)
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 6),
+                                child: Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.flag,
+                                      size: 15,
+                                      color: AppColors.primary,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Expanded(
+                                      child: Text(
+                                        'Salida: ${partida.direccion}',
+                                        style: const TextStyle(
+                                          fontSize: 12.5,
+                                          color: AppColors.primary,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
                             if (ruta.isEmpty)
                               const Padding(
                                 padding: EdgeInsets.symmetric(vertical: 8),
@@ -199,17 +226,24 @@ class MapaRutasScreen extends StatelessWidget {
   }
 }
 
-/// Dibuja las paradas (A, B, C…) en el orden optimizado.
+/// Dibuja las paradas (A, B, C…) en el orden optimizado y, si existe, el
+/// punto de salida con una bandera.
 class _RutaPainter extends CustomPainter {
-  _RutaPainter(this.ruta);
+  _RutaPainter(this.ruta, this.partida);
 
   final List<Pedido> ruta;
+  final PuntoPartida? partida;
 
   static const _radio = 11.0;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final puntos = _proyectar(size);
+    final conPartida = partida != null;
+    final puntos = _proyectar(size, [
+      if (conPartida) (lat: partida!.lat, lng: partida!.lng),
+      for (final p in ruta) (lat: p.lat, lng: p.lng),
+    ]);
+    final paradas = conPartida ? puntos.skip(1).toList() : puntos;
 
     final linea = Paint()
       ..color = AppColors.primary.withValues(alpha: 0.85)
@@ -217,12 +251,15 @@ class _RutaPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round
       ..style = PaintingStyle.stroke;
-    if (puntos.length > 1) {
-      final path = Path()..moveTo(puntos.first.dx, puntos.first.dy);
-      for (final p in puntos.skip(1)) {
+    if (paradas.length > 1) {
+      final path = Path()..moveTo(paradas.first.dx, paradas.first.dy);
+      for (final p in paradas.skip(1)) {
         path.lineTo(p.dx, p.dy);
       }
       canvas.drawPath(path, linea);
+    }
+    if (conPartida && paradas.isNotEmpty) {
+      _lineaPunteada(canvas, puntos.first, paradas.first, linea);
     }
 
     final relleno = Paint()..color = Colors.white;
@@ -230,33 +267,68 @@ class _RutaPainter extends CustomPainter {
       ..color = AppColors.text
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1;
-    for (final (i, p) in puntos.indexed) {
+    for (final (i, p) in paradas.indexed) {
       canvas
         ..drawCircle(p, _radio, relleno)
         ..drawCircle(p, _radio, borde);
-      final tp = TextPainter(
-        text: TextSpan(
-          text: _etiqueta(i),
-          style: const TextStyle(
-            color: AppColors.text,
-            fontSize: 10,
-            fontWeight: FontWeight.w700,
-          ),
+      _texto(
+        canvas,
+        p,
+        _etiqueta(i),
+        const TextStyle(
+          color: AppColors.text,
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
         ),
-        textDirection: TextDirection.ltr,
-      )..layout();
-      tp.paint(canvas, p - Offset(tp.width / 2, tp.height / 2));
+      );
+    }
+
+    if (conPartida) {
+      final p = puntos.first;
+      canvas.drawCircle(p, _radio + 1, Paint()..color = AppColors.primary);
+      _texto(
+        canvas,
+        p,
+        String.fromCharCode(Icons.flag.codePoint),
+        TextStyle(
+          color: Colors.white,
+          fontSize: 13,
+          fontFamily: Icons.flag.fontFamily,
+          package: Icons.flag.fontPackage,
+        ),
+      );
+    }
+  }
+
+  void _texto(Canvas canvas, Offset centro, String texto, TextStyle estilo) {
+    final tp = TextPainter(
+      text: TextSpan(text: texto, style: estilo),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    tp.paint(canvas, centro - Offset(tp.width / 2, tp.height / 2));
+  }
+
+  void _lineaPunteada(Canvas canvas, Offset a, Offset b, Paint paint) {
+    const trazo = 6.0, espacio = 5.0;
+    final total = (b - a).distance;
+    if (total == 0) return;
+    final dir = (b - a) / total;
+    for (var d = 0.0; d < total; d += trazo + espacio) {
+      final fin = math.min(d + trazo, total);
+      canvas.drawLine(a + dir * d, a + dir * fin, paint);
     }
   }
 
   /// Convierte lat/lng a coordenadas del lienzo conservando proporciones.
-  List<Offset> _proyectar(Size size) {
+  List<Offset> _proyectar(Size size, List<({double lat, double lng})> geo) {
+    if (geo.length == 1) return [size.center(Offset.zero)];
+
     const margen = _radio + 8;
     final ancho = size.width - margen * 2;
     final alto = size.height - margen * 2;
 
-    final lats = ruta.map((p) => p.lat);
-    final lngs = ruta.map((p) => p.lng);
+    final lats = geo.map((p) => p.lat);
+    final lngs = geo.map((p) => p.lng);
     final minLat = lats.reduce(math.min), maxLat = lats.reduce(math.max);
     final minLng = lngs.reduce(math.min), maxLng = lngs.reduce(math.max);
     final rangoLat = math.max(maxLat - minLat, 1e-6);
@@ -266,9 +338,8 @@ class _RutaPainter extends CustomPainter {
     final offsetX = margen + (ancho - rangoLng * escala) / 2;
     final offsetY = margen + (alto - rangoLat * escala) / 2;
 
-    if (ruta.length == 1) return [size.center(Offset.zero)];
     final puntos = [
-      for (final p in ruta)
+      for (final p in geo)
         Offset(
           offsetX + (p.lng - minLng) * escala,
           // El norte queda arriba.

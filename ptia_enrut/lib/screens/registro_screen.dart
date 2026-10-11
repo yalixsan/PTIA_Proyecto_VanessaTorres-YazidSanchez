@@ -15,12 +15,14 @@ class _RegistroScreenState extends State<RegistroScreen> {
   final _formKey = GlobalKey<FormState>();
   final _email = TextEditingController();
   final _password = TextEditingController();
+  final _confirmacion = TextEditingController();
   final _codigo = TextEditingController();
 
   @override
   void dispose() {
     _email.dispose();
     _password.dispose();
+    _confirmacion.dispose();
     _codigo.dispose();
     super.dispose();
   }
@@ -44,10 +46,16 @@ class _RegistroScreenState extends State<RegistroScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              IconBoxButton(
-                icon: Icons.arrow_back,
-                tooltip: 'Volver',
-                onPressed: () => Navigator.of(context).pop(),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  IconBoxButton(
+                    icon: Icons.arrow_back,
+                    tooltip: 'Volver',
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                  const AppLogo(),
+                ],
               ),
               const SizedBox(height: 4),
               const Center(
@@ -84,6 +92,23 @@ class _RegistroScreenState extends State<RegistroScreen> {
                               hintText: 'Contraseña',
                             ),
                             validator: validarContrasena,
+                          ),
+                          const SizedBox(height: 14),
+                          TextFormField(
+                            controller: _confirmacion,
+                            obscureText: true,
+                            textInputAction: TextInputAction.next,
+                            decoration: const InputDecoration(
+                              hintText: 'Confirmar contraseña',
+                            ),
+                            validator: (v) {
+                              if ((v ?? '').isEmpty) {
+                                return 'Confirma tu contraseña';
+                              }
+                              return v == _password.text
+                                  ? null
+                                  : 'Las contraseñas no coinciden';
+                            },
                           ),
                           const SizedBox(height: 14),
                           TextFormField(

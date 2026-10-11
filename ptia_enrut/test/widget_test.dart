@@ -80,9 +80,81 @@ void main() {
 
     await tester.tap(find.text('Inicia tu ruta'));
     await tester.pumpAndSettle();
+    expect(find.text('¿Desde dónde inicias la ruta?'), findsOneWidget);
+
+    // Sin dirección no deja iniciar.
+    await tester.tap(find.text('Iniciar ruta'));
+    await tester.pump();
+    expect(find.text('Ingresa la dirección de salida'), findsOneWidget);
+
+    await tester.enterText(
+      find.widgetWithText(
+        TextFormField,
+        'Ej: Calle 145 #91-19 (bodega, casa…)',
+      ),
+      'Calle 140 #100-10',
+    );
+    await tester.tap(find.text('Iniciar ruta'));
+    await tester.pumpAndSettle();
     expect(find.text('Mapa de Rutas'), findsOneWidget);
     expect(find.text('Pedidos que hacen falta:'), findsOneWidget);
+    expect(find.text('Salida: Calle 140 #100-10'), findsOneWidget);
+    expect(appState.ruta, hasLength(5));
     expect(appState.ruta.first.rapida, isTrue);
     expect(appState.ruta.first.estado, EstadoPedido.enCamino);
+  });
+
+  testWidgets('el registro exige que las contraseñas coincidan', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1080, 2340);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+    addTearDown(appState.cerrarSesion);
+
+    await tester.pumpWidget(const EnrutApp());
+    await tester.tap(find.textContaining('regístrate'));
+    await tester.pumpAndSettle();
+
+    final campos = find.byType(TextFormField);
+    await tester.enterText(campos.at(0), 'nuevo@enrut.ai');
+    await tester.enterText(campos.at(1), 'secreto123');
+    await tester.enterText(campos.at(2), 'secreto999');
+    await tester.enterText(campos.at(3), 'EMP01');
+    await tester.tap(find.text('Registrarse'));
+    await tester.pump();
+    expect(find.text('Las contraseñas no coinciden'), findsOneWidget);
+    expect(appState.sesionIniciada, isFalse);
+
+    await tester.enterText(campos.at(2), 'secreto123');
+    await tester.tap(find.text('Registrarse'));
+    await tester.pumpAndSettle();
+    expect(appState.sesionIniciada, isTrue);
+    expect(find.text('¿Cómo gestionarás tus entregas hoy?'), findsOneWidget);
+  });
+
+  group('AppState.iniciarRuta', () {
+    late AppState estado;
+
+    setUp(() {
+      estado = AppState()..cargarPedidosEmpresa();
+    });
+
+    test('desde un punto de entrega: ese pedido es la primera parada', () {
+      final elegido = estado.pedidos.firstWhere((p) => !p.rapida);
+      expect(estado.iniciarRuta(desdePedido: elegido), isTrue);
+      expect(estado.ruta.first, elegido);
+      expect(estado.ruta, hasLength(estado.pedidos.length));
+      expect(estado.partida, isNull);
+    });
+
+    test('desde otra dirección: no se agrega como entrega', () {
+      expect(estado.iniciarRuta(direccionPartida: 'Calle 150 #92-10'), isTrue);
+      expect(estado.partida?.direccion, 'Calle 150 #92-10');
+      expect(estado.ruta, hasLength(estado.pedidos.length));
+
+      estado.marcarEntregado(estado.ruta.first);
+      expect(estado.partida, isNull);
+    });
   });
 }

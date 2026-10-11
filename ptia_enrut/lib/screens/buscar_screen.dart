@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/pedido.dart';
 import '../state/app_state.dart';
 import '../theme/app_theme.dart';
+import '../widgets/common.dart';
 
 /// Busca pedidos (pendientes y entregados) por dirección o nombre.
 class BuscarScreen extends StatefulWidget {
@@ -36,11 +37,22 @@ class _BuscarScreenState extends State<BuscarScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const Padding(
-              padding: EdgeInsets.fromLTRB(16, 18, 16, 12),
-              child: Text(
-                'Buscar',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+              padding: EdgeInsets.fromLTRB(12, 12, 12, 12),
+              child: Row(
+                children: [
+                  SizedBox(width: 40),
+                  Expanded(
+                    child: Text(
+                      'Buscar',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  AppLogo(),
+                ],
               ),
             ),
             Padding(

@@ -20,6 +20,10 @@ class AppState extends ChangeNotifier {
   List<Pedido> ruta = [];
   double distanciaRutaKm = 0;
 
+  /// Dirección de salida cuando no es un punto de entrega (null si la ruta
+  /// arranca en una entrega o ya se hizo la primera).
+  PuntoPartida? partida;
+
   final List<Pedido> entregados = [];
 
   int _siguienteId = 0;
@@ -43,6 +47,7 @@ class AppState extends ChangeNotifier {
     pedidos.clear();
     seleccionados.clear();
     ruta = [];
+    partida = null;
     distanciaRutaKm = 0;
     entregados.clear();
     notifyListeners();
@@ -106,20 +111,44 @@ class AppState extends ChangeNotifier {
     }
   }
 
+  /// Pedidos marcados en la lista, candidatos para la ruta.
+  List<Pedido> get pedidosSeleccionados =>
+      pedidos.where((p) => seleccionados.contains(p.id)).toList();
+
   /// Optimiza los pedidos seleccionados y los convierte en la ruta activa.
+  ///
+  /// - [direccionPartida]: el repartidor sale de un lugar que no es una
+  ///   entrega (bodega, casa…); se usa solo para llegar a la primera parada.
+  /// - [desdePedido]: el repartidor ya está en ese punto de entrega, así que
+  ///   es la primera parada y el resto se optimiza desde ahí.
+  /// - Ninguno: se parte del centro de Suba.
+  ///
   /// Devuelve false si no hay pedidos seleccionados.
-  bool iniciarRuta() {
-    final elegidos = pedidos
-        .where((p) => seleccionados.contains(p.id))
-        .toList();
+  bool iniciarRuta({String? direccionPartida, Pedido? desdePedido}) {
+    assert(direccionPartida == null || desdePedido == null);
+    final elegidos = pedidosSeleccionados;
     if (elegidos.isEmpty) return false;
 
-    final resultado = RouteOptimizer.optimizar(
-      elegidos,
-      inicio: BogotaGeocoder.subaCentro,
-    );
-    ruta = resultado.paradas;
-    distanciaRutaKm = resultado.distanciaKm;
+    partida = null;
+    if (desdePedido != null && elegidos.remove(desdePedido)) {
+      final inicio = (lat: desdePedido.lat, lng: desdePedido.lng);
+      final resultado = RouteOptimizer.optimizar(elegidos, inicio: inicio);
+      ruta = [desdePedido, ...resultado.paradas];
+      distanciaRutaKm = resultado.distanciaKm;
+    } else {
+      var inicio = BogotaGeocoder.subaCentro;
+      if (direccionPartida != null && direccionPartida.trim().isNotEmpty) {
+        inicio = BogotaGeocoder.ubicar(direccionPartida);
+        partida = PuntoPartida(
+          direccion: direccionPartida.trim(),
+          lat: inicio.lat,
+          lng: inicio.lng,
+        );
+      }
+      final resultado = RouteOptimizer.optimizar(elegidos, inicio: inicio);
+      ruta = resultado.paradas;
+      distanciaRutaKm = resultado.distanciaKm;
+    }
     _actualizarEstadosRuta();
     notifyListeners();
     return true;
@@ -130,6 +159,8 @@ class AppState extends ChangeNotifier {
       ..estado = EstadoPedido.entregado
       ..entregadoEn = DateTime.now();
     ruta.remove(pedido);
+    // Tras la primera entrega el repartidor ya salió del punto de partida.
+    partida = null;
     pedidos.remove(pedido);
     seleccionados.remove(pedido.id);
     entregados.insert(0, pedido);
@@ -147,6 +178,18 @@ class AppState extends ChangeNotifier {
       }
     }
   }
+}
+
+class PuntoPartida {
+  const PuntoPartida({
+    required this.direccion,
+    required this.lat,
+    required this.lng,
+  });
+
+  final String direccion;
+  final double lat;
+  final double lng;
 }
 
 final appState = AppState();
